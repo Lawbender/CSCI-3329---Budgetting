@@ -29,7 +29,10 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS expenses (
     expense text ,
     expense_price real,
     subscription text,
-    subscription_price real
+    subscription_price real,
+    daily_purchase text,
+    daily_purchases_price real
+    
 )""")
 connection.commit()
 connection.close()
@@ -146,37 +149,56 @@ class MainPage(myWindow):
         self.user = user
         self.myframe = MyFrame(master=self)
         self.myframe.grid(row=0, column=0, padx = 45)
-        
+
         connection = sqlite3.connect('data.db')
         cursor = connection.cursor()
         self.balance = cursor.execute(f"SELECT accountBalance FROM userInfo WHERE username = '{self.user}';")
         self.balance = cursor.fetchone()[0]
-        
+
         self.actLabel = CTkLabel(master=self.myframe, text=f" Account balance \n ${'{:.2f}'.format(self.balance)}").grid(row=0, column=0)
-        
+
         self.balance = cursor.execute(f"SELECT SavingBalance FROM userInfo WHERE username = '{self.user}';")
         self.balance = cursor.fetchone()[0]
-       
-        
+
+
         CTkLabel(master=self.myframe, text=f" Savings balance \n ${'{:.2f}'.format(self.balance)}").grid(row=0, column=1)
         CTkButton(master=self.myframe, text="Deposit",command=self.addFunds).grid(pady=25, row=1, column=0)
-        CTkButton(master=self.myframe, text="Withdrawl").grid(row=2, column=0)
-        CTkButton(master = self.myframe,text = "Transfer",command=self.moveFunds).grid(row= 1, column = 1)
+
+        CTkButton(master=self.myframe, text="Transfer",command=self.moveFunds).grid(row=1, column=1)
         self.goals_frame = MyFrame(master=self)
         self.goals_frame.grid(row=0, column=1)
         CTkLabel(master=self.goals_frame, text="Enter your goals:").grid(row=0, column=0)
         self.goals_entry = CTkEntry(master=self.goals_frame)
         self.goals_entry.grid(row=1, column=0)
         CTkButton(master=self.goals_frame, text="Add Goal", command=self.save_goals).grid(row=2, column=0)
-        
+
+        CTkLabel(master=self.myframe, text="Expenses", font=("Arial", 14, "bold"), pady=10).grid(row=3, column=0)
+
         self.load_goals(user)
-        
+        self.load_expenses(user)
+
+        # Add a section for adding purchases
+        self.purchases_frame = MyFrame(master=self.myframe)
+        self.purchases_frame.grid(row=0, column=2, )
+
+        CTkLabel(master=self.purchases_frame, text="Price:").grid(row=0, column=0)
+
        
+        self.purchase_price = CTkEntry(master=self.purchases_frame)
         
+        self.purchase_price.grid(row = 1,column=0)
+
+        CTkLabel(master=self.purchases_frame, text="Select category:").grid(row=0, column=2)
+        self.category_var = StringVar(master=self.purchases_frame)
+        self.category_var.set("")
+        self.category_menu = CTkOptionMenu(master=self.purchases_frame, variable=self.category_var, values=["Food", "Transportation", "Entertainment", "Other"])
+        self.category_menu.grid(row=1, column=2)
+
+        CTkButton(master=self.purchases_frame, text="Add Purchase", command=self.add_purchase).grid(row=2, column = 1,pady=30)
+
       
         
-   
-        
+    
         
     def save_goals(self):
         goal = self.goals_entry.get()
@@ -188,7 +210,20 @@ class MainPage(myWindow):
             connection.close()
             self.load_goals(self.user)
             self.goals_entry.delete(0, 'end')
+    def load_expenses(self, user):
+        connection = sqlite3.connect('data.db')
+        cursor = connection.cursor()
+        goals = cursor.execute(f"SELECT expense, expense_price FROM expenses WHERE username = '{user}';").fetchall()
+        connection.close()
+
+        # Add a header label
         
+        # Add expense items
+        for i, goal in enumerate(goals):
+            expense_label = CTkLabel(master=self.myframe, text=f"{i+1}. {goal[0]}: ${goal[1]:.2f}", font=("Arial", 12))
+            expense_label.grid(row=i+3, column=0, sticky="w", padx=10, pady=5)
+
+
     def load_goals(self, user):
         connection = sqlite3.connect('data.db')
         cursor = connection.cursor()
@@ -266,6 +301,26 @@ class MainPage(myWindow):
 
         CTkButton(master=win, text="Transfer to Saving", command=help).pack()
         CTkButton(master = win, text= "Transer to Checking account", command = helper).pack()
+    def add_purchase(self):
+        # Get the purchase details
+        daily_purchase = self.category_menu.get()
+        daily_purchases_price = self.purchase_price.get()
+
+        # Insert the purchase data into the expenses table
+        connection = sqlite3.connect('data.db')
+        cursor = connection.cursor()
+        cursor.execute("INSERT INTO expenses (username, daily_purchase, daily_purchases_price) VALUES (?, ?, ?)", (self.user, daily_purchase, daily_purchases_price))
+        amount = daily_purchases_price
+        current_balance = cursor.execute(f"SELECT accountBalance FROM userInfo WHERE username = '{self.user}';").fetchone()[0]
+        new_balance = current_balance- float(amount)
+        cursor.execute(f"UPDATE userInfo SET accountBalance = '{new_balance}' WHERE username = '{self.user}';")
+       
+        connection.commit()
+        connection.close()
+
+        # Show a message box to confirm the purchase was added
+        messagebox.showinfo("Purchase added", "The purchase was added successfully!")
+
 
 
     
